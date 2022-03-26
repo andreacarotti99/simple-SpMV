@@ -23,9 +23,13 @@ will generate a 100x100 matrix in a matrix.txt file with approximately 67 non-ze
 
 ### Running SpMV
 
+To run the program you need to pass as arguments:
+- N: number of rows of the matrix in "matrix.txt"
+- M: number of columns of the matrix in "matrix.txt"
+- FORMAT: the format that can be either COO or CSR
 ```bash
 gcc matrix_reader.c -o matrix_reader
-./matrix_reader 10 10
+./matrix_reader 10 10 COO
 ```
 
-will run SpMV with the generated matrix
+will run SpMV with the generated matrix in COO format
