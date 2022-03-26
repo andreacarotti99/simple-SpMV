@@ -18,7 +18,7 @@ gcc sparse_matrix_generator.c -o sparse_matrix_generator
 ./sparse_matrix_generator 10 10 0.67
 ```
 
-will generate a 100x100 matrix in a matrix.txt file with approximately 67 non-zero elements out of 100
+will generate a 10x10 matrix in a matrix.txt file with approximately 67 non-zero elements out of 100
 
 
 ### Running SpMV
