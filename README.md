@@ -4,9 +4,9 @@ simple-SpMV are some scripts in C made for a naive implementation of Sparse Matr
 
 y = Ax
 
-## Run simple-SpMV
+# Run simple-SpMV
 
-###Generating a MxN sparse matrix
+### Generating a MxN sparse matrix
 
 First we need to generate a matrix in the directory passing as arguments
 - M: Number of rows of the generated matrix
