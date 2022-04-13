@@ -5,10 +5,10 @@
 #include <math.h>
 
 
-#define ARRAY_LENGTH 1000
+#define ARRAY_LENGTH 100
 #define MAX_FLOAT_VALUE 10
-#define ROWS 60
-#define COLS 60
+#define ROWS 9
+#define COLS 9
 #define DENSITY 0.2
 #define CODIFICA "COO"
 
@@ -76,7 +76,7 @@ int main(int argc, char *argv[]){
 		mat[random_row][random_cols] = (float)rand()/(float)(RAND_MAX/MAX_FLOAT_VALUE);
 	}
 
-	print_matrix(mat, rows, cols);
+	//print_matrix(mat, rows, cols);
 
 
 	printf("\nAllocating data structures for spmv...\n");
@@ -184,7 +184,7 @@ int main(int argc, char *argv[]){
 		spmv_ell(indices_EL2, data_EL2, max_nz_per_row, rows, x, y);
 	}
 	print_y(y, cols);
-	printf("Program successfully terminated.\n");
+	printf("\nProgram successfully terminated.\n");
 	return 0;
 }
 
@@ -206,12 +206,14 @@ void spmv_ell(int *indices, float *data, int max_nz_per_row, int rows, float *x,
 
 void spmv_coo(int *rowind, int *colind, float *val, int number_of_nz, float *x, float *y) {
   asm volatile("starting_computation_coo:\n");
+  asm volatile("nop\nnop\nnop\nnop\nnop\n");
   int i;
-  for(i = 0; i < number_of_nz ; i++){
+  for(i = 0; i < number_of_nz ; i++){	  
     y[rowind[i]] += val[i] * x[colind[i]];
     //printf("y[%d] = %f\n", i, y[i]);
   }
   asm volatile("ending_computation_coo:\n");
+  asm volatile("nop\nnop\nnop\nnop\nnop\n");
 }
 
 
@@ -383,4 +385,3 @@ void print_matrix(float *mat, int R, int C){
 	}
 
 }
-
