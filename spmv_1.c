@@ -5,10 +5,10 @@
 #include <math.h>
 
 
-#define ARRAY_LENGTH 100
+#define ARRAY_LENGTH 1000
 #define MAX_FLOAT_VALUE 10
-#define ROWS 4
-#define COLS 4
+#define ROWS 60
+#define COLS 60
 #define DENSITY 0.2
 #define CODIFICA "COO"
 
@@ -27,6 +27,7 @@ void print_ELL();
 void switch_float_array();
 void switch_int_array();
 void print_matrix();
+
 
 /******************************************************************** MAIN *************************************************************************************/
 
@@ -59,6 +60,7 @@ int main(int argc, char *argv[]){
 	int *indices_EL2;
 
 	printf("\nInitializing matrix all zeros...\n");
+	
 
 
 	for (int i = 0; i < ROWS; i++){
@@ -189,6 +191,7 @@ int main(int argc, char *argv[]){
 /****************************************************************** FUNCTIONS ********************************************************************************/
 
 void spmv_ell(int *indices, float *data, int max_nz_per_row, int rows, float *x, float *y) {
+  asm volatile("starting_computation_ell:\n");
   int i, j;
   for(j = 0; j <  max_nz_per_row; j++){
     for(i = 0; i < rows; i++){
@@ -198,19 +201,23 @@ void spmv_ell(int *indices, float *data, int max_nz_per_row, int rows, float *x,
 
     }
   }
+  asm volatile("ending_computation_ell:\n");
 }
 
 void spmv_coo(int *rowind, int *colind, float *val, int number_of_nz, float *x, float *y) {
+  asm volatile("starting_computation_coo:\n");
   int i;
   for(i = 0; i < number_of_nz ; i++){
     y[rowind[i]] += val[i] * x[colind[i]];
     //printf("y[%d] = %f\n", i, y[i]);
   }
+  asm volatile("ending_computation_coo:\n");
 }
 
 
 void spmv_csr(int *row_ptr, int *colind, float *val, int number_of_nz, float *x, float *y)
 {
+  asm volatile("starting_computation_csr:\n");
   int i, j;
   float temp;
   for(i = 0; i < number_of_nz ; i++)
@@ -221,6 +228,7 @@ void spmv_csr(int *row_ptr, int *colind, float *val, int number_of_nz, float *x,
     }
     y[i] = temp;
   }
+  asm volatile("ending_computation_csr:\n");
 }
 
 /****************************************************************** SUPPORT FUNCTIONS ********************************************************************************/
@@ -232,11 +240,26 @@ float *generate_x(int C){
 	float r;
 	int i;
 
+	int x_int;
+	float x_float;
+	float x_cut;
+	float small_float;
+	int small_int;
+
+
 	float *array = (float*) malloc(C * sizeof(float));
 	for (i=0; i<C; i++){
-		//array[i] = (float)rand()/(float)(RAND_MAX/MAX_FLOAT_VALUE);
-		array[i] = 2;
-		printf("generated... x[%d] = %f\n",i, array[i]);
+		array[i] = (float)rand()/(float)(RAND_MAX/MAX_FLOAT_VALUE);
+		//array[i] = 2;
+
+		x_int = (int) array[i];
+		x_float = array[i];
+		x_cut = (float) x_int;
+		small_float = x_float - x_int;
+		small_float = small_float * 100;
+		small_int = (int) small_float;
+
+		printf("generated... x[%d] = %d.%d\n",i, x_int, small_int);
 	}
 	return array;
 }
@@ -334,8 +357,6 @@ void switch_int_array (int *array1, int *array2, int rows, int cols){
 	*/
 }
 
-
-
 void print_matrix(float *mat, int R, int C){
 
 	float mat_float;
@@ -362,3 +383,4 @@ void print_matrix(float *mat, int R, int C){
 	}
 
 }
+
