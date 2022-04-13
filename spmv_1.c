@@ -2,9 +2,16 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <math.h>
 
-#define ARRAY_LENGTH 10000
+
+#define ARRAY_LENGTH 100
 #define MAX_FLOAT_VALUE 10
+#define ROWS 4
+#define COLS 4
+#define DENSITY 0.2
+#define CODIFICA "COO"
+
 
 /******************************************************************* DECLARING FUNCTIONS *********************************************************************/
 
@@ -19,96 +26,31 @@ void print_debug();
 void print_ELL();
 void switch_float_array();
 void switch_int_array();
+void print_matrix();
 
 /******************************************************************** MAIN *************************************************************************************/
 
 int main(int argc, char *argv[]){
+	printf("\nInitializing all variables...\n");
+
 	int number_of_nz = 0;
-
-	/*
-	if (argc != 4){
-		printf("Error: you need to provide R (rows) C (columns) and format of the matrix to read\n");
-		exit(0);
-	}
-	*/
-	
-	FILE* p;
-	p = fopen("matrix.txt", "r");
-	if (p == NULL) printf("Error in reading the file\n");
-	
-
-	//int rows = atoi(argv[1]);
-	//int cols = atoi(argv[2]);
-	int rows = 50;
-	int cols = 50;
+	float mat[ROWS][COLS];
+	int rows = ROWS;
+	int cols = COLS;
 	float num_read;
-
-	/*
-	//CLASSIC ARRAY DEFINITION
-	int row[ARRAY_LENGTH];
-	int indices[ARRAY_LENGTH];
-	float data[ARRAY_LENGTH];
-	*/
-
-	//MALLOC ARRAY DEFINITION
+	float density = DENSITY;
+	int random_to_generate = density*rows*cols;
+	int random_row;
+	int random_cols;
 	int *row;
 	int *indices;
 	int *ptr;
 	float *data;
-
-	//CSR AND COO
-	
-	indices = (int*) malloc(ARRAY_LENGTH * sizeof(int));
-	data = (float*) malloc(ARRAY_LENGTH * sizeof(float));
-
-	//COO
-	row = (int*) malloc(ARRAY_LENGTH * sizeof(int));
-
-	//CSR
-	ptr = (int*) malloc(ARRAY_LENGTH * sizeof(int));
-	
-	if (row == NULL || indices == NULL || data == NULL) {
-        printf("Memory not allocated.\n");
-        exit(0);
-  	}
-  	
-
 	int data_iterator = 0;
 	int row_iterator = 0;
 	int indices_iterator = 0;
 	int ptr_iterator = 0;
 	int i,j;
-
-	ptr[0] = 0;
-	ptr_iterator = 1;
-
-
-	//READING THE MATRIX FOR COO AND CSR
-	for (i = 0; i < rows; i++){
-		for (j = 0; j < cols; j++){
-			fscanf(p,"%f",&num_read);
-			if (num_read != 0){
-				data[data_iterator] = num_read;
-				
-				row[row_iterator] = i;
-				indices[indices_iterator] = j;
-
-				data_iterator++;
-				row_iterator++;
-				indices_iterator++;
-
-				number_of_nz++;
-			}
-		}
-		//adding the current number_of_nz to the ptr array
-		ptr[ptr_iterator] = number_of_nz;
-		ptr_iterator++;
-	}
-
-
-/**************************************************************************************************************************************************/
-
-	//READING THE MATRIX FOR ELL
 	int max_nz_per_row = 0;
 	int nz_per_row = 0;
 	float *data_ELL;
@@ -116,18 +58,67 @@ int main(int argc, char *argv[]){
 	int *indices_ELL;
 	int *indices_EL2;
 
+	printf("\nInitializing matrix all zeros...\n");
 
+
+	for (int i = 0; i < ROWS; i++){
+		for (int j = 0; j < COLS; j++){
+			mat[i][j] = 0;
+		}
+	}
+
+	printf("\nPopulating matrix with random values...\n");
+	for (int i=0;i<random_to_generate;i++){
+		random_row = rand() % rows;
+		random_cols = rand() % cols;
+		mat[random_row][random_cols] = (float)rand()/(float)(RAND_MAX/MAX_FLOAT_VALUE);
+	}
+
+	print_matrix(mat, rows, cols);
+
+
+	printf("\nAllocating data structures for spmv...\n");
+	indices = (int*) malloc(ARRAY_LENGTH * sizeof(int));
+	data = (float*) malloc(ARRAY_LENGTH * sizeof(float));
+	row = (int*) malloc(ARRAY_LENGTH * sizeof(int));
+	ptr = (int*) malloc(ARRAY_LENGTH * sizeof(int));
 	
 
-	if (strcmp(argv[1],"ELL")==0){
-		
-		rewind(p);
+	if (row == NULL || indices == NULL || data == NULL) {
+    printf("Memory not allocated.\n");
+    exit(0);
+  	}
 
-		//checking what is the max number of non-zero per row in the matrix to allocate an array for ELL format
+	ptr[0] = 0;
+	ptr_iterator = 1;
+
+	printf("\nStarting reading the matrix to populate data structures...\n");
+	for (i = 0; i < rows; i++){
+		for (j = 0; j < cols; j++){
+			if (mat[i][j] != 0){
+				data[data_iterator] = mat[i][j];
+				row[row_iterator] = i;
+				indices[indices_iterator] = j;
+				data_iterator++;
+				row_iterator++;
+				indices_iterator++;
+				number_of_nz++;
+			}
+		}
+		ptr[ptr_iterator] = number_of_nz;
+		ptr_iterator++;
+	}
+
+
+/**************************************************************************************************************************************************/
+
+	if (strcmp(CODIFICA,"ELL")==0){
+		
 		for (i = 0; i < rows; i++){
 			for (j = 0; j < cols; j++){
-				fscanf(p,"%f",&num_read);
-				if (num_read != 0){
+				//fscanf(p,"%f",&num_read);
+
+				if (mat[i][j] != 0){
 					nz_per_row++;
 				}
 			}
@@ -136,8 +127,7 @@ int main(int argc, char *argv[]){
 			}
 			nz_per_row = 0;
 		}
-		
-		rewind(p);
+
 
 		data_ELL = (float*) malloc(rows*max_nz_per_row * sizeof(float));
 		data_EL2 = (float*) malloc(rows*max_nz_per_row * sizeof(float));
@@ -156,9 +146,8 @@ int main(int argc, char *argv[]){
 
  		for (i = 0; i < rows; i++){
 			for (j = 0; j < cols; j++){
-				fscanf(p,"%f",&num_read);
-				if (num_read != 0){
-					data_ELL[max_nz_per_row*i + data_ELL_iterator] = num_read;
+				if (mat[i][j] != 0){
+					data_ELL[max_nz_per_row*i + data_ELL_iterator] = mat[i][j];
 					indices_ELL[max_nz_per_row*i + indices_ELL_iterator] = j;
 					data_ELL_iterator++;
 					indices_ELL_iterator++;
@@ -167,10 +156,6 @@ int main(int argc, char *argv[]){
 			data_ELL_iterator = 0;
 			indices_ELL_iterator = 0;
 		}
-
-		//print_ELL(data_EL2, indices_EL2, rows, max_nz_per_row);
-		
-
 	}
 
 
@@ -181,19 +166,23 @@ int main(int argc, char *argv[]){
 	float *y = (float*) malloc(cols * sizeof(float));
 
 
-	if(strcmp(argv[1],"COO")==0){
+	if(strcmp(CODIFICA,"COO")==0){
+		printf("\nStarting multiplication with COO format...\n");
 		spmv_coo(row, indices, data, number_of_nz, x, y);
 	}
-	else if (strcmp(argv[1],"CSR")==0){
+	else if (strcmp(CODIFICA,"CSR")==0){
+		printf("\nStarting multiplication with CSR format...\n");
 		spmv_csr(ptr, indices, data, number_of_nz, x, y);
 	}
-	else if (strcmp(argv[1],"ELL")==0){
+	else if (strcmp(CODIFICA,"ELL")==0){
 		switch_float_array(data_ELL, data_EL2, rows, max_nz_per_row);
 		switch_int_array(indices_ELL, indices_EL2, rows, max_nz_per_row);
 		//print_ELL(data_EL2, indices_EL2, rows, max_nz_per_row);
+		printf("\nStarting multiplication with ELL format...\n");
 		spmv_ell(indices_EL2, data_EL2, max_nz_per_row, rows, x, y);
-	}	
+	}
 	print_y(y, cols);
+	printf("Program successfully terminated.\n");
 	return 0;
 }
 
@@ -245,28 +234,35 @@ float *generate_x(int C){
 
 	float *array = (float*) malloc(C * sizeof(float));
 	for (i=0; i<C; i++){
-		array[i] = (float)rand()/(float)(RAND_MAX/MAX_FLOAT_VALUE);
-		//array[i] = 2;
+		//array[i] = (float)rand()/(float)(RAND_MAX/MAX_FLOAT_VALUE);
+		array[i] = 2;
 		printf("generated... x[%d] = %f\n",i, array[i]);
 	}
 	return array;
 }
 
 
-
-
-void print_info(rows, cols, number_of_nz){
-	float rows_float = rows;
-	float cols_float = cols;
-	float number_of_nz_float = number_of_nz;
-	printf("Number of NZ: %d\n", number_of_nz);
-	printf("Density: %f\n", number_of_nz_float/(rows_float*cols_float));
-}
-
 void print_y(float *y, int length){
+	float y_float;
+	float small_float;
+	float y_cut;
+	int small_int;
+	int y_int;
+
+
 	printf("\nARRAY y: \n");
+	printf("(The array is printed with int values instead of float...)\n");
 	for (int i = 0; i < length; i++){
-		printf("y[%d] = %f\n", i, y[i]);
+
+		y_int = (int) y[i];
+		y_float = y[i];
+		y_cut = (float) y_int;
+		small_float = y_float - y_int;
+		small_float = small_float * 100;
+		small_int = (int) small_float;
+
+
+		printf("y[%d] = %d.%d\n", i, y_int, small_int);
 	}
 }
 
@@ -336,4 +332,33 @@ void switch_int_array (int *array1, int *array2, int rows, int cols){
 	}
 	printf("]\n");
 	*/
+}
+
+
+
+void print_matrix(float *mat, int R, int C){
+
+	float mat_float;
+	float small_float;
+	float mat_cut;
+	int small_int;
+	int mat_int;
+
+
+	printf("\nPrinting the matrix...\n");
+	for (int i = 0; i < R; i++){
+		for(int j = 0; j < C; j++){
+
+			mat_int = (int) mat[i*C+j];
+			mat_float = mat[i*C+j];
+			mat_cut = (float) mat_int;
+			small_float = mat_float - mat_int;
+			small_float = small_float * 100;
+			small_int = (int) small_float;
+
+			printf("%d.%d ", mat_int, small_int);
+		}
+		printf("\n");
+	}
+
 }
