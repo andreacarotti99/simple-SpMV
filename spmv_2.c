@@ -1,9 +1,10 @@
 /*
 
-* This program executes spmv with COO format and a matrix with density 0.2
+* This program executes spmv with COO and CSR format and a matrix with density 0.2
 * Generates the matrix directly in the support structures for COO format by extracting a value different from zero with probability 0.8
+* From the COO data structures we then create the CSR data structures
 * All the data structures are dynamically allocated
-* Tested with matrix from: 2x2 -- 60x60
+* Tested with matrix from: 2x2 -- 100x100
 
 */
 #include <stdio.h>
@@ -15,10 +16,11 @@
 #define DEBUG 1
 
 #define MAX_FLOAT_VALUE 10
-#define ROWS 4
-#define COLS 4
+#define ROWS 400
+#define COLS 400
 #define DENSITY 0.2
 #define CODIFICA "COO"
+#define ITERATIONS 200
 
 
 /******************************************************************* DECLARING FUNCTIONS *********************************************************************/
@@ -37,6 +39,8 @@ void print_matrix();
 float fun();
 void print_ptr_indices_data_row();
 void print_float(float f);
+int count_max_nz_per_row(int *ptr);
+void reset_y();
 
 int number_of_nz = 0;
 int ptr_iterator = 0;
@@ -133,7 +137,14 @@ int main(int argc, char *argv[]){
 			print_ptr_indices_data_row(ptr, indices, data, row);
 		}
 		printf("\nStarting multiplication with COO format...\n");
-		spmv_coo(row, indices, data, number_of_nz, x, y);		
+
+		asm volatile("nop\nnop\nnop\nnop\n");
+		for (int i=0; i < ITERATIONS; i++){
+			//setting y to 0
+			reset_y(y);
+			spmv_coo(row, indices, data, number_of_nz, x, y);
+		}
+		asm volatile("nop\nnop\nnop\nnop\n");
 		free(row);
 		free(indices);
 		free(data);
@@ -144,11 +155,21 @@ int main(int argc, char *argv[]){
 			print_ptr_indices_data_row(ptr, indices, data, row);
 		}
 		printf("\nStarting multiplication with CSR format...\n");
-		spmv_csr(ptr, indices, data, number_of_nz, x, y);
+		for (int i = 0; i < ITERATIONS; i++){
+			asm volatile("nop\nnop\nnop\n");
+			reset_y(y);
+			spmv_csr(ptr, indices, data, number_of_nz, x, y);
+		}
 	}
 
 	else if (strcmp(CODIFICA,"ELL")==0){
+		int max_row_elements = count_max_nz_per_row(ptr);
+
+		int *data_ell = (int *) malloc(max_row_elements*sizeof(float));
+		int *indices_ell = (int *) malloc(max_row_elements*sizeof(int));
+
 		printf("\nStarting multiplication with ELL format...\n");
+
 		//spmv_ell(indices_EL2, data_EL2, max_nz_per_row, rows, x, y);
 	}
 
@@ -180,8 +201,9 @@ void spmv_ell(int *indices, float *data, int max_nz_per_row, int rows, float *x,
 }
 
 void spmv_coo(int *rowind, int *indices, float *data, int number_of_nz, float *x, float *y) {
+	asm volatile("nop\nnop\nnop\n");
   asm volatile("starting_computation_coo:\n");
-  asm volatile("nop\nnop\nnop\nnop\nnop\n");
+  //asm volatile("nop\nnop\nnop\n");
   int i;
   int index_x;
   int index_y;
@@ -222,25 +244,49 @@ void spmv_coo(int *rowind, int *indices, float *data, int number_of_nz, float *x
 
   }
   asm volatile("ending_computation_coo:\n");
-  asm volatile("nop\nnop\nnop\nnop\nnop\n");
+  //asm volatile("nop\nnop\nnop\nnop\n");
 }
 
 
 void spmv_csr(int *ptr, int *indices, float *data, int number_of_nz, float *x, float *y)
 {
+	asm volatile("nop\nnop\nnop\n");
   asm volatile("starting_computation_csr:\n");
   int i, j;
   float temp;
+  float data_j;
+  int indices_j;
+  float x_indices_j;
+  float mul;
+
+  asm volatile("starting_outer_loop:\n");
   for(i = 0; i < number_of_nz ; i++)
   {
+  	asm volatile("save_index_y_in_temp:\n");
     temp = y[i];
+    asm volatile("inner_loop:\n");
     for(j = ptr[i]; j < ptr[i+1]; j++){
-      temp += data[j] * x[indices[j]];
+    	asm volatile("saving_data_j:\n");
+    	data_j = data[j];
+    	asm volatile("saving_indices_j:\n");
+    	indices_j = indices[j];
+    	asm volatile("saving_x_indices_j:\n");
+    	x_indices_j = x[indices_j];
+    	asm volatile("data_j_mul_x_indices_j:\n");
+    	mul = (data_j * x_indices_j);
+    	asm volatile("temp_plus_mul:\n");
+    	temp = temp + mul;
+    	asm volatile("incrementing_inner_loop:\n");
+      
     }
+    asm volatile("saving_new_temp:\n");
     y[i] = temp;
+    asm volatile("incrementing_outer_loop:\n");
   }
   asm volatile("ending_computation_csr:\n");
+  asm volatile("nop\nnop\nnop\nnop\n");
 }
+
 
 /****************************************************************** SUPPORT FUNCTIONS ********************************************************************************/
 
@@ -340,9 +386,33 @@ void print_ptr_indices_data_row(int *ptr, int *indices, float *data, int *row){
 	printf("]\n");
 	printf("data = [ ");
 	for (int i = 0; i < number_of_nz; i++){
-		printf("%f ", data[i]);
+		print_float(data[i]);
+		printf(" ");
 	}
 	printf("]\n");
-	
+}
 
+int count_max_nz_per_row(int *ptr){
+	int val_1 = 0; 
+	int val_2 = 0;
+	int j;
+	int temp = 0;
+	int max = 0;
+	//ptr dim is ROWS + 1
+	for (int i = 0; i < ROWS; i++){
+		j = i + 1;
+		val_1 = ptr[i];
+		val_2 = ptr[j];
+		temp = val_2 - val_1;
+		if (temp > max){
+			max = temp;
+		}
+	}
+	return max;
+}
+
+void reset_y(float *y){
+	for (int i=0; i < ROWS; i++){
+		y[i] = 0;
+	}
 }
